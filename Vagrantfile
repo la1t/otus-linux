@@ -66,7 +66,11 @@ Vagrant.configure("2") do |config|
  	  box.vm.provision "shell", inline: <<-SHELL
 	      mkdir -p ~root/.ssh
               cp ~vagrant/.ssh/auth* ~root/.ssh
-	      yum install -y mdadm smartmontools hdparm gdisk
+              yum install -y mdadm smartmontools hdparm gdisk
+              mdadm --create /dev/md0 --level=10 --raid-devices=4 /dev/sd[b-e]
+              mkdir /etc/mdadm
+              echo "DEVICE partitions" > /etc/mdadm/mdadm.conf
+              mdadm --detail --scan --verbose | awk '/ARRAY/ {print}' >> /etc/mdadm/mdadm.conf
   	  SHELL
 
       end
