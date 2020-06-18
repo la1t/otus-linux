@@ -1,0 +1,293 @@
+$ lsblk
+NAME   MAJ:MIN RM SIZE RO TYPE MOUNTPOINT
+sda      8:0    0  40G  0 disk 
+`-sda1   8:1    0  40G  0 part /
+sdb      8:16   0   4G  0 disk i|-s] [<command>]
+
+$ sudo -i
+ # fdisk /dev/sdb
+Welcome to fdisk (util-linux 2.23.2).
+
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table
+Building a new DOS disklabel with disk identifier 0x7ff5e689.
+
+Command (m for help): n
+Partition type:
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended
+Select (default p): w 
+Using default response p
+Partition number (1-4, default 1): 
+First sector (2048-8388607, default 2048): 
+Using default value 2048
+Last sector, +sectors or +size{K,M,G} (2048-8388607, default 8388607): 
+Using default value 8388607
+Partition 1 of type Linux and of size 4 GiB is set
+
+Command (m for help): w
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+ # mdadm --create /dev/md0 --level=1 --raid-devices=2 missing /dev/sdb1
+mdadm: Note: this array has metadata at the start and
+    may not be suitable as a boot device.  If you plan to
+    store '/boot' on this device please ensure that
+    your boot-loader understands md/v1.x metadata, or use
+    --metadata=0.90
+Continue creating array? y
+mdadm: Defaulting to version 1.2 metadata
+mdadm: array /dev/md0 started.
+ # mkfs.ext4 /dev/md0
+mke2fs 1.42.9 (28-Dec-2013)
+Filesystem label=
+OS type: Linux
+Block size=4096 (log=2)
+Fragment size=4096 (log=2)
+Stride=0 blocks, Stripe width=0 blocks
+262144 inodes, 1047552 blocks
+52377 blocks (5.00%) reserved for the super user
+First data block=0
+Maximum filesystem blocks=1073741824
+32 block groups
+32768 blocks per group, 32768 fragments per group
+8192 inodes per group
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912, 819200, 884736
+
+Allocating group tables:  0/32     done                            
+Writing inode tables:  0/32     done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information:  0/32     done
+
+ # mount /dev/md0 /mnt
+
+ # cd /mnt
+
+ # rsync -axux / ./
+
+ # mount --bind /proc /mnt/proc
+
+ # mount --bind /dev /mnt/dev
+
+ # mount --bind /sys /mnt/sys
+
+ # chroot /mnt
+
+ # ls -l /dev/disk/by-uuid | grep md
+lrwxrwxrwx. 1 root root  9 Jun 17 21:05 27eaf3e6-d8e3-43e0-b949-f9f4c0ec764e -> ../../md0
+
+ # vi /etc/fstab    # меняем uuid диска на выведенный выше
+
+ # mdadm --examine --scan >> /etc/mdadm.conf
+
+ # mv /boot/initramfs-3.10.0-1127.el7.x86_64.img /boot/initramfs-3.10.0-1127.el7.x86_64.img .bak
+
+ # dracut --mdadmconf --force /boot/initramfs-$(uname -r).img $(uname -r)
+
+ # touch /.autorelabel
+
+ # vi /etc/vi /etc/grub   # добавляем в параметры запуска rd.auto=1
+
+ # grub2-mkconfig -o /boot/grub2/grub.cfg
+Generating grub configuration file ...
+/usr/sbin/grub2-probe: warning: Couldn't find physical volume `(null)'. Some modules may be missing from core image..
+Found linux image: /boot/vmlinuz-3.10.0-1127.el7.x86_64
+Found initrd image: /boot/initramfs-3.10.0-1127.el7.x86_64.img
+/usr/sbin/grub2-probe: warning: Couldn't find physical volume `(null)'. Some modules may be missing from core image..
+/usr/sbin/grub2-probe: warning: Couldn't find physical volume `(null)'. Some modules may be missing from core image..
+/usr/sbin/grub2-probe: warning: Couldn't find physical volume `(null)'. Some modules may be missing from core image..
+/usr/sbin/grub2-probe: warning: Couldn't find physical volume `(null)'. Some modules may be missing from core image..
+done
+
+ # vi /boot/grub2/grub.cfg  # проверяем, rd.auto и uuid записались корректно
+
+ # grub2-install /dev/sda
+Installing for i386-pc platform.
+grub2-install: warning: Couldn't find physical volume `(null)'. Some modules may be missing from core image..
+grub2-install: warning: Couldn't find physical volume `(null)'. Some modules may be missing from core image..
+Installation finished. No error reported.
+
+ # grub2-install /dev/sdb
+Installing for i386-pc platform.
+grub2-install: warning: Couldn't find physical volume `(null)'. Some modules may be missing from core image..
+grub2-install: warning: Couldn't find physical volume `(null)'. Some modules may be missing from core image..
+Installation finished. No error reported.
+
+ # sudo reboot -f
+Rebooting.
+Connection to 127.0.0.1 closed by remote host.
+
+Connection to 127.0.0.1 closed.
+
+
+
+Last login: Wed Jun 17 21:04:31 2020 from 10.0.2.2
+
+ $ lsblk
+NAME    MAJ:MIN RM SIZE RO TYPE  MOUNTPOINT
+sda       8:0    0  40G  0 disk  
+`-sda1    8:1    0  40G  0 part  
+sdb       8:16   0   4G  0 disk  
+`-sdb1    8:17   0   4G  0 part  
+  `-md0   9:0    0   4G  0 raid1 /
+
+ $ sudo -i
+
+ # fdisk -l
+
+Disk /dev/sda: 42.9 GB, 42949672960 bytes, 83886080 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk label type: dos
+Disk identifier: 0x0009ef1a
+
+   Device Boot      Start         End      Blocks   Id  System
+/dev/sda1   *        2048    83886079    41942016   83  Linux
+
+Disk /dev/sdb: 4294 MB, 4294967296 bytes, 8388608 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disk label type: dos
+Disk identifier: 0x7ff5e689
+
+   Device Boot      Start         End      Blocks   Id  System
+/dev/sdb1            2048     8388607     4193280   83  Linux
+
+Disk /dev/md0: 4290 MB, 4290772992 bytes, 8380416 sectors
+Units = sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+ # fdisk  /dev/sda
+Welcome to fdisk (util-linux 2.23.2).
+
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help): h
+h: unknown command
+Command action
+   a   toggle a bootable flag
+   b   edit bsd disklabel
+   c   toggle the dos compatibility flag
+   d   delete a partition
+   g   create a new empty GPT partition table
+   G   create an IRIX (SGI) partition table
+   l   list known partition types
+   m   print this menu
+   n   add a new partition
+   o   create a new empty DOS partition table
+   p   print the partition table
+   q   quit without saving changes
+   s   create a new empty Sun disklabel
+   t   change a partition's system id
+   u   change display/entry units
+   v   verify the partition table
+   w   write table to disk and exit
+   x   extra functionality (experts only)
+
+Command (m for help): d
+Selected partition 1
+Partition 1 is deleted
+
+Command (m for help): n
+Partition type:
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended
+Select (default p): 
+Using default response p
+Partition number (1-4, default 1): 
+First sector (2048-83886079, default 2048): 
+Using default value 2048
+Last sector, +sectors or +size{K,M,G} (2048-83886079, default 83886079): 
+Using default value 83886079
+Partition 1 of type Linux and of size 40 GiB is set
+
+Command (m for help): w
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table.
+Syncing disks.
+
+ # mdadm --zero-superblock /dev/sda1
+mdadm: Unrecognised md component device - /dev/sda1
+
+ # mdadm /dev/md0 --add /dev/sda1
+mdadm: added /dev/sda1
+
+ # cat /proc/mdstat
+Personalities : [raid1] 
+md0 : active raid1 sda1[2] sdb1[1]
+      4190208 blocks super 1.2 [2/1] [_U]
+      [=============>.......]  recovery = 69.4% (2911616/4190208) finish=0.1min speed=116464K/sec
+      
+unused devices: <none>
+
+ # cat /proc/mdstat
+Personalities : [raid1] 
+md0 : active raid1 sda1[2] sdb1[1]
+      4190208 blocks super 1.2 [2/1] [_U]
+      [================>....]  recovery = 82.8% (3471232/4190208) finish=0.0min speed=128564K/sec
+      
+unused devices: <none>
+
+ # cat /proc/mdstat
+Personalities : [raid1] 
+md0 : active raid1 sda1[2] sdb1[1]
+      4190208 blocks super 1.2 [2/1] [_U]
+      [=================>...]  recovery = 85.5% (3586304/4190208) finish=0.0min speed=128082K/sec
+      
+unused devices: <none>
+
+ # cat /proc/mdstat
+Personalities : [raid1] 
+md0 : active raid1 sda1[2] sdb1[1]
+      4190208 blocks super 1.2 [2/1] [_U]
+      [=================>...]  recovery = 88.1% (3696512/4190208) finish=0.0min speed=127465K/sec
+      
+unused devices: <none>
+
+ # cat /proc/mdstat
+Personalities : [raid1] 
+md0 : active raid1 sda1[2] sdb1[1]
+      4190208 blocks super 1.2 [2/1] [_U]
+      [===================>.]  recovery = 99.3% (4162432/4190208) finish=0.0min speed=125290K/sec
+      
+unused devices: <none>
+
+ # cat /proc/mdstat
+Personalities : [raid1] 
+md0 : active raid1 sda1[2] sdb1[1]
+      4190208 blocks super 1.2 [2/2] [UU]
+      
+unused devices: <none>
+
+ # grub2-install /dev/sda
+Installing for i386-pc platform.
+Installation finished. No error reported.
+
+ # reboot -f
+Rebooting.
+Connection to 127.0.0.1 closed by remote host.
+
+Connection to 127.0.0.1 closed.
+
+
+Last login: Wed Jun 17 21:23:10 2020 from 10.0.2.2
+
+ $ lsblk
+NAME    MAJ:MIN RM SIZE RO TYPE  MOUNTPOINT
+sda       8:0    0  40G  0 disk  
+`-sda1    8:1    0  40G  0 part  
+  `-md0   9:0    0   4G  0 raid1 /
+sdb       8:16   0   4G  0 disk  
+`-sdb1    8:17   0   4G  0 part  
+  `-md0   9:0    0   4G  0 raid1 /
